@@ -2,7 +2,6 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #define BUFFER_SIZE 2048
@@ -18,7 +17,6 @@
 #define RELEASE_TIME 0.03f
 
 #define SEMITONE2Freq(n) (pow(2, (float)n/12.0f) * 16.352)
-static char temp_text[256];
 
 typedef struct {
     bool isPlaying;
@@ -40,18 +38,26 @@ const char* note_name[KEYBOARD_NOTES] = {
     "F#","G", "G#", "A", "A#", "B"
 };
 
-const char* note_key_names[KEYBOARD_NOTES] = {
-    "Q", "W", "E", "R", "T", "Y",
-    "U", "I", "O", "P", "[", "]"
+const char* note_key_names[2][KEYBOARD_NOTES] = {
+    { // With no Transpose
+    "Z", "S", "X", "D", "C", "V",
+    "G", "B", "H", "N", "J", "M"
+    },
+    { // With Transpose
+     "A", "Z", "S", "X", "D", "C",
+     "V", "G", "B", "H", "N", "M"
+    }
 };
 
-// const int note_keys[KEYBOARD_NOTES] = {
-//     KEY_Z, KEY_S, KEY_X, KEY_D, KEY_C, KEY_V,
-//     KEY_G, KEY_B, KEY_N, KEY_J, KEY_M, KEY_COMMA
-// };
-const int note_keys[KEYBOARD_NOTES] = {
-    KEY_Q, KEY_W, KEY_E, KEY_R, KEY_T, KEY_Y,
-    KEY_U, KEY_I, KEY_O, KEY_P, KEY_LEFT_BRACKET, KEY_RIGHT_BRACKET
+const int note_keys[2][KEYBOARD_NOTES] = {
+    { // With no Transpose
+    KEY_Z, KEY_S, KEY_X, KEY_D, KEY_C, KEY_V,
+    KEY_G, KEY_B, KEY_H, KEY_N, KEY_J, KEY_M
+    },
+    { // With Transpose
+     KEY_A, KEY_Z, KEY_S, KEY_X, KEY_D, KEY_C,
+     KEY_V, KEY_G, KEY_B, KEY_H, KEY_N, KEY_M
+    }
 };
 
 typedef struct {
@@ -134,10 +140,13 @@ void update_audio_stream(AppState *app) {
     }
 }
 
+bool global_is_octive_up = false;
+bool global_is_octive_down = false;
 void handle_input(AppState *app) {
     float dt = GetFrameTime();
+    int transpose_index = app->transpose == 0 ? 0 : 1;
     for (int i = 0; i < KEYBOARD_NOTES; ++i) {
-        if (IsKeyDown(note_keys[i])) {
+        if (IsKeyDown(note_keys[transpose_index][i])) {
             app->notes[i].isPlaying = true;
             app->notes[i].note_down_time += dt*60; // TODO: Replace this with const
         } else {
@@ -169,6 +178,28 @@ void handle_input(AppState *app) {
     }
     if (IsKeyPressed(KEY_TAB)) {
         app->showKeyboardKeys = !app->showKeyboardKeys;
+    }
+    if (IsKeyDown(KEY_LEFT_SHIFT)) {
+        if (!global_is_octive_up && !global_is_octive_down) {
+            app->octive++;
+            global_is_octive_up = true;
+        }
+    } else {
+        if (global_is_octive_up) {
+            app->octive--;
+            global_is_octive_up = false;
+        }
+    }
+    if (IsKeyDown(KEY_LEFT_CONTROL)) {
+        if (!global_is_octive_down && !global_is_octive_up) {
+            app->octive--;
+            global_is_octive_down = true;
+        }
+    } else {
+        if (global_is_octive_down) {
+            app->octive++;
+            global_is_octive_down = false;
+        }
     }
 }
 
@@ -242,82 +273,91 @@ void render_spark(Shader spark_shader,
     EndShaderMode();
     EndBlendMode();
 }
-
-void draw_piano(AppState *app) {
-    int totalSemitones = KEYBOARD_NOTES;
+void draw_piano_keys(AppState *app, bool is_black) {
     const int whiteKeyCount = 7;
-
     float piano_height = GetScreenHeight() - NOTES_DESTROY_LINE;
     float pianoY = NOTES_DESTROY_LINE;
     float whiteKeyWidth = (float)GetScreenWidth() / whiteKeyCount;
     float blackKeyWidth =  whiteKeyWidth * 0.6f;
     float blackKeyHeight = piano_height * 0.6f;
 
+    int whiteKeyIndex = 0;
+    for (int i = 0; i < KEYBOARD_NOTES; i++) {
+        int note_index = (i + app->transpose) % KEYBOARD_NOTES;
+        if (note_index < 0) note_index += KEYBOARD_NOTES;
+        const char* note = note_name[note_index];
+        int transpose_index = app->transpose == 0 ? 0 : 1;
+
+        int octave = app->octive;
+        int semitone_offset = i + app->transpose;
+        if (semitone_offset < 0) octave -= (abs(semitone_offset) / KEYBOARD_NOTES) + 1;
+        else                     octave += semitone_offset / KEYBOARD_NOTES;
+
+        bool is_sharp = strchr(note, '#') != 0;
+        bool should_render = is_black ? is_sharp : !is_sharp;
+
+        if (should_render) {
+            float x;
+            if (is_black) {
+                x = whiteKeyIndex * whiteKeyWidth - blackKeyWidth / 2;
+                Rectangle keyRect = {x, pianoY, blackKeyWidth, blackKeyHeight};
+                Color keyColor = BLACK;
+                if (app->notes[i].isPlaying) {
+                    keyColor = ColorFromHSV((360.f/12.f) * i, 1.0f, 1.0f);
+                }
+                DrawRectangleRec(keyRect, keyColor);
+
+                if (app->showKeyboardKeys) {
+                    const char* key_name = note_key_names[transpose_index][i];
+                    int textWidth = MeasureText(key_name, 15);
+                    DrawText(key_name, (x + blackKeyWidth/2.0) - textWidth/2.0f,
+                            pianoY + blackKeyHeight - 45, 15, WHITE);
+                }
+
+                const char* text = TextFormat("%s%d", note, octave);
+                int textWidth = MeasureText(note, 20);
+                DrawText(text, (x + blackKeyWidth/2.0) - textWidth/2.0,
+                        pianoY + blackKeyHeight - 25, 15, WHITE);
+            } else {
+                x = whiteKeyIndex * whiteKeyWidth;
+                Rectangle keyRect = {x, pianoY, whiteKeyWidth - 1, piano_height};
+
+                Color keyColor = (whiteKeyIndex % 2 == 0) ? WHITE : LIGHTGRAY;
+                if (app->notes[i].isPlaying) {
+                    keyColor = ColorFromHSV((360.f/12.f) * i, 1.0f, 1.0f);
+                }
+                DrawRectangleRec(keyRect, keyColor);
+
+                if (app->showKeyboardKeys) {
+                    const char* key_name = note_key_names[transpose_index][i];
+                    int textWidth = MeasureText(key_name, 18);
+                    DrawText(key_name, x + whiteKeyWidth/2 - textWidth/2.0f,
+                            pianoY + piano_height - 50, 18, DARKGRAY);
+                }
+
+                const char* text = TextFormat("%s%d", note, octave);
+                int textWidth = MeasureText(text, 20);
+                DrawText(text, x + whiteKeyWidth/2 - textWidth/2.0f,
+                        pianoY + piano_height - 30, 20, GRAY);
+            }
+        }
+
+        if (!is_sharp) {
+            whiteKeyIndex++;
+        }
+    }
+}
+
+void draw_piano(AppState *app) {
+    float piano_height = GetScreenHeight() - NOTES_DESTROY_LINE;
+    float pianoY = NOTES_DESTROY_LINE;
+
     DrawRectangle(0, pianoY - 10, GetScreenWidth(), piano_height + 10, DARKBROWN);
 
     // First pass: Draw all white keys
-    int whiteKeyIndex = 0;
-    for (int i = 0; i < totalSemitones; i++) {
-        int note_index = (i + app->transpose) % KEYBOARD_NOTES;
-        if (note_index < 0) note_index += KEYBOARD_NOTES;
-        const char* note = note_name[note_index];
-
-        int octave = app->octive;
-        int semitone_offset = i + app->transpose;
-        if (semitone_offset < 0) octave -= (abs(semitone_offset) / KEYBOARD_NOTES) + 1;
-        else                     octave += semitone_offset / KEYBOARD_NOTES;
-
-        if (!strchr(note, '#')) {
-            float x = whiteKeyIndex * whiteKeyWidth;
-            Rectangle whiteKey = {x, pianoY, whiteKeyWidth - 1, piano_height};
-
-            Color keyColor = (whiteKeyIndex % 2 == 0) ? WHITE : LIGHTGRAY;
-            if (app->notes[i].isPlaying) {
-                keyColor = ColorFromHSV((360.f/12.f) * i, 1.0f, 1.0f);
-            }
-            DrawRectangleRec(whiteKey, keyColor);
-
-            // Draw note name
-            sprintf(temp_text, "%s%d", note, octave);
-            int textWidth = MeasureText(temp_text, 20);
-            DrawText(temp_text, x + whiteKeyWidth/2 - textWidth/2.0f,
-                    pianoY + piano_height - 30, 20, GRAY);
-
-            whiteKeyIndex++;
-        }
-    }
-
-    whiteKeyIndex = 0;
-    for (int i = 0; i < totalSemitones; i++) {
-        int note_index = (i + app->transpose) % KEYBOARD_NOTES;
-        if (note_index < 0) note_index += KEYBOARD_NOTES;
-        const char* note = note_name[note_index];
-
-        int octave = app->octive;
-        int semitone_offset = i + app->transpose;
-        if (semitone_offset < 0) octave -= (abs(semitone_offset) / KEYBOARD_NOTES) + 1;
-        else                     octave += semitone_offset / KEYBOARD_NOTES;
-
-        if (strchr(note, '#')) {
-            float x = whiteKeyIndex * whiteKeyWidth - blackKeyWidth / 2;
-
-            Rectangle blackKey = {x, pianoY, blackKeyWidth, blackKeyHeight};
-            Color keyColor = BLACK;
-            if (app->notes[i].isPlaying) {
-                keyColor = ColorFromHSV((360.f/12.f) * i, 1.0f, 1.0f);
-            }
-            DrawRectangleRec(blackKey, keyColor);
-
-            // Draw note name
-            sprintf(temp_text, "%s%d", note, octave);
-            int textWidth = MeasureText(note, 20);
-            DrawText(temp_text, (x + blackKeyWidth/2.0) - textWidth/2.0,
-                    pianoY + blackKeyHeight - 25, 15, WHITE);
-        } else {
-            whiteKeyIndex++;
-        }
-    }
-
+    draw_piano_keys(app, false);
+    // Second pass: Draw all black keys
+    draw_piano_keys(app, true);
 }
 
 int main(void) {
@@ -383,59 +423,6 @@ int main(void) {
             }
 
             draw_piano(&app);
-
-            // for (int i = 0; i < KEYBOARD_NOTES; i++) {
-            //     int index = abs(i + app.transpose) % KEYBOARD_NOTES;
-            //     bool isMinerNote = strlen(note_name[index]) == 2;
-            //     if (isMinerNote) {
-            //         Rectangle rec = (Rectangle) {key * i, NOTES_DESTROY_LINE, key, height * 0.65};
-            //         DrawRectangleRec(rec, BLACK);
-            //     }
-            // }
-
-            // for (int i = 0; i < KEYBOARD_NOTES; ++i) {
-            //     int index = abs(i + app.transpose) % KEYBOARD_NOTES;
-            //     bool isMinerNote = strlen(note_name[index]) == 2;
-
-            //     // octave number
-            //     int note_octive = app.octive;
-            //     if (app.transpose > 0 && i > app.transpose) {
-            //         note_octive ++;
-            //     } else if (app.transpose < 0 && i < abs(app.transpose)) {
-            //         note_octive --;
-            //     }
-
-            //     // Note name
-            //     char text[5] = {0};
-            //     if (!app.showKeyboardKeys) {
-            //         sprintf(text, "%s%d", note_name[index], note_octive);
-            //     } else {
-            //         sprintf(text, "%s", note_key_names[i]);
-            //     }
-
-            //     // Note color
-            //     Color note_color = ColorFromHSV((360.f/12.f) * i, 0.2f, 0.2f);
-            //     if (app.notes[i].isPlaying) {
-            //         note_color = ColorFromHSV((360.f/12.f) * i, 1.0f, 1.0f);
-            //     }
-
-            //     // font
-            //     int fontSize = 30;
-            //     int note_width = isMinerNote ? fontSize / 4 : MeasureText(text, fontSize);
-            //     int half_note_offset = isMinerNote ? 15 : 0;
-
-
-
-            //     // Vector2 pos = {0};
-            //     // pos.x = ((GetScreenWidth() / 24.0f) * ((i*2) + 1)) - (note_width / 2.0f);
-            //     // pos.y = GetScreenHeight() - 60 - half_note_offset;
-
-            //     // float rotation = isMinerNote ? 90 : 0;
-
-            //     // // draw note text
-            //     // //DrawText(text, note_start , GetScreenHeight() - 60 - half_note_offset, fontSize, note_color);
-            //     // DrawTextPro(GetFontDefault(), text, pos, Vector2Zero(), rotation ,fontSize, 1.0, note_color);
-            // }
 
         EndDrawing();
     }

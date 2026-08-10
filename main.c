@@ -12,12 +12,20 @@
 
 #define KEYBOARD_NOTES 12
 #define MAX_NOTE_EVENTS 20
-#define NOTES_DESTROY_LINE 500
+#define NOTES_DESTROY_LINE 600
 
 #define ATTACK_TIME  0.005f
 #define RELEASE_TIME 0.03f
 
 #define SEMITONE2Freq(n) (pow(2, (float)n/12.0f) * 16.352)
+
+const char* help_text = "\
+F1: Hide Help\n\
+TAB: Show/Hide Keyboard Mappings\n\
+R-Shift: Hold to increase octave\n\
+R-Ctrl: Hold to decrease octave\n\
+Left/Right arrows: transpose notes\n\
+up/down arrows: change octave";
 
 typedef struct {
     bool isPlaying;
@@ -67,11 +75,11 @@ typedef struct {
     int octive;
     int transpose;
     bool showKeyboardKeys;
+    bool showHelp;
     NoteState notes[KEYBOARD_NOTES];
     int vnotesIndex[KEYBOARD_NOTES];
     VisualNote vnotes[KEYBOARD_NOTES][MAX_NOTE_EVENTS];
     float audio_buf[BUFFER_SIZE];
-
 } AppState;
 
 float create_audio_frame(NoteState notes[KEYBOARD_NOTES], int octive, int transpose, float amp) {
@@ -179,6 +187,9 @@ void handle_input(AppState *app) {
     }
     if (IsKeyPressed(KEY_TAB)) {
         app->showKeyboardKeys = !app->showKeyboardKeys;
+    }
+    if (IsKeyPressed(KEY_F1)) {
+        app->showHelp = !app->showHelp;
     }
     if (IsKeyDown(KEY_LEFT_SHIFT)) {
         if (!global_is_octive_up && !global_is_octive_down) {
@@ -364,7 +375,7 @@ void draw_piano(AppState *app) {
 }
 
 int main(void) {
-    InitWindow(800, 600, "MIDI-Orite");
+    InitWindow(1080, 800, "MIDI-Orite");
     InitAudioDevice();
 
     //Sound tick = LoadSound("assets/Tick.mp3");
@@ -428,7 +439,11 @@ int main(void) {
             draw_piano(&app);
 
             // UI
-            DrawText(TextFormat("F1: Help"), 10, 10, 18, RAYWHITE);
+            if (app.showHelp) {
+                DrawText(help_text, 10, 10, 20, RAYWHITE);
+            } else {
+                DrawText(TextFormat("F1: Help"), 10, 10, 20, RAYWHITE);
+            }
 
         EndDrawing();
     }

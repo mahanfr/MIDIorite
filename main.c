@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include "embed.h"
 #define BUFFER_SIZE 2048
 #define SAMPLE_RATE 48000
 #define SAMPLE_SIZE 32
@@ -216,7 +217,8 @@ void draw_notes(AppState *app) {
                 .width  = note_width_box,
                 .height = 10 * app->notes[i].note_down_time
             };
-            DrawRectanglePro(rec, Vector2Zero(), 0.f, note_color);
+            //DrawRectanglePro(rec, Vector2Zero(), 0.f, note_color);
+            DrawRectangleRounded(rec, 1, 20, note_color);
         }
 
         for (int j = 0; j < app->vnotesIndex[i]; j++) {
@@ -237,7 +239,8 @@ void draw_notes(AppState *app) {
                         .width  = note_width_box,
                         .height = 10 * app->vnotes[i][j].duration
                     };
-                    DrawRectanglePro(rec, Vector2Zero(), 0.f, note_color);
+                    //DrawRectanglePro(rec, Vector2Zero(), 0.f, note_color);
+                    DrawRectangleRounded(rec, 1, 20, note_color);
                 }
             }
         }
@@ -374,7 +377,7 @@ int main(void) {
     Image img = GenImageColor(128, 128, WHITE);
     Texture2D sparkTexture = LoadTextureFromImage(img);
     UnloadImage(img);
-    Shader spark_shader = LoadShader("assets/spark.vs", "assets/spark.fs");
+    Shader spark_shader = LoadShaderFromMemory(SparkVertexShader, SparkFragmentShader);
 
     sparkShaderTimeLoc = GetShaderLocation(spark_shader, "time");
     sparkShaderSeedLoc = GetShaderLocation(spark_shader, "age");
@@ -423,6 +426,9 @@ int main(void) {
             }
 
             draw_piano(&app);
+
+            // UI
+            DrawText(TextFormat("F1: Help"), 10, 10, 18, RAYWHITE);
 
         EndDrawing();
     }

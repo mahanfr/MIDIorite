@@ -1,8 +1,8 @@
-#include <bits/posix2_lim.h>
 #include <math.h>
 #include <raylib.h>
 #include <raymath.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #define BUFFER_SIZE 2048
@@ -18,6 +18,7 @@
 #define RELEASE_TIME 0.03f
 
 #define SEMITONE2Freq(n) (pow(2, (float)n/12.0f) * 16.352)
+static char temp_text[256];
 
 typedef struct {
     bool isPlaying;
@@ -159,12 +160,12 @@ void handle_input(AppState *app) {
         if (app->octive > 0) app->octive --;
     }
     if (IsKeyPressed(KEY_LEFT)) {
-        app->transpose -= 6;
-        if (app->transpose < -6) app->transpose = -6;
+        app->transpose -= KEYBOARD_NOTES / 2;
+        if (app->transpose < -(KEYBOARD_NOTES / 2)) app->transpose = -(KEYBOARD_NOTES / 2);
     }
     if (IsKeyPressed(KEY_RIGHT)) {
-        app->transpose += 6;
-        if (app->transpose > 6) app->transpose = 6;
+        app->transpose += KEYBOARD_NOTES / 2;
+        if (app->transpose > KEYBOARD_NOTES / 2) app->transpose = KEYBOARD_NOTES / 2;
     }
     if (IsKeyPressed(KEY_TAB)) {
         app->showKeyboardKeys = !app->showKeyboardKeys;
@@ -245,7 +246,7 @@ void render_spark(Shader spark_shader,
 void draw_piano(AppState *app) {
     int totalSemitones = KEYBOARD_NOTES;
     const int whiteKeyCount = 7;
-    
+
     float piano_height = GetScreenHeight() - NOTES_DESTROY_LINE;
     float pianoY = NOTES_DESTROY_LINE;
     float whiteKeyWidth = (float)GetScreenWidth() / whiteKeyCount;
@@ -257,7 +258,14 @@ void draw_piano(AppState *app) {
     // First pass: Draw all white keys
     int whiteKeyIndex = 0;
     for (int i = 0; i < totalSemitones; i++) {
-        const char* note = note_name[i];
+        int note_index = (i + app->transpose) % KEYBOARD_NOTES;
+        if (note_index < 0) note_index += KEYBOARD_NOTES;
+        const char* note = note_name[note_index];
+
+        int octave = app->octive;
+        int semitone_offset = i + app->transpose;
+        if (semitone_offset < 0) octave -= (abs(semitone_offset) / KEYBOARD_NOTES) + 1;
+        else                     octave += semitone_offset / KEYBOARD_NOTES;
 
         if (!strchr(note, '#')) {
             float x = whiteKeyIndex * whiteKeyWidth;
@@ -270,8 +278,9 @@ void draw_piano(AppState *app) {
             DrawRectangleRec(whiteKey, keyColor);
 
             // Draw note name
-            int textWidth = MeasureText(note, 20);
-            DrawText(note, x + whiteKeyWidth/2 - textWidth/2.0f, 
+            sprintf(temp_text, "%s%d", note, octave);
+            int textWidth = MeasureText(temp_text, 20);
+            DrawText(temp_text, x + whiteKeyWidth/2 - textWidth/2.0f,
                     pianoY + piano_height - 30, 20, GRAY);
 
             whiteKeyIndex++;
@@ -280,7 +289,14 @@ void draw_piano(AppState *app) {
 
     whiteKeyIndex = 0;
     for (int i = 0; i < totalSemitones; i++) {
-        const char* note = note_name[i];
+        int note_index = (i + app->transpose) % KEYBOARD_NOTES;
+        if (note_index < 0) note_index += KEYBOARD_NOTES;
+        const char* note = note_name[note_index];
+
+        int octave = app->octive;
+        int semitone_offset = i + app->transpose;
+        if (semitone_offset < 0) octave -= (abs(semitone_offset) / KEYBOARD_NOTES) + 1;
+        else                     octave += semitone_offset / KEYBOARD_NOTES;
 
         if (strchr(note, '#')) {
             float x = whiteKeyIndex * whiteKeyWidth - blackKeyWidth / 2;
@@ -293,8 +309,9 @@ void draw_piano(AppState *app) {
             DrawRectangleRec(blackKey, keyColor);
 
             // Draw note name
-            int textWidth = MeasureText(note, 15);
-            DrawText(note, x + blackKeyWidth/2 - textWidth/2.0, 
+            sprintf(temp_text, "%s%d", note, octave);
+            int textWidth = MeasureText(note, 20);
+            DrawText(temp_text, (x + blackKeyWidth/2.0) - textWidth/2.0,
                     pianoY + blackKeyHeight - 25, 15, WHITE);
         } else {
             whiteKeyIndex++;
@@ -330,11 +347,8 @@ int main(void) {
     app.transpose = 0;
 
     SetTargetFPS(60);
-    float dt = 0.0f;
     float age = 0.0f;
     while (!WindowShouldClose()) {
-        dt = GetFrameTime();
-
         handle_input(&app);
         update_audio_stream(&app);
 

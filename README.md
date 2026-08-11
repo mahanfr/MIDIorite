@@ -21,7 +21,7 @@ The project focuses on creating a synthesizer that is not only functional but al
 
 A demonstration video will be added here.
 
-[![Watch the video]()](https://github.com/mahanfr/MIDIorite/blob/master/media/demo.mp4)
+https://github.com/user-attachments/assets/2aa48644-b782-45e5-86b6-072c989725e4
 
 ## Building
 

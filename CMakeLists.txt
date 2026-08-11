@@ -46,6 +46,11 @@ if(WIN32)
             WIN32_EXECUTABLE TRUE
         )
 
+        target_link_options(midiorite PRIVATE
+            /SUBSYSTEM:WINDOWS 
+            /ENTRY:mainCRTStartup
+        )
+
     elseif(MINGW)
 
         message(STATUS "Building Windows / MinGW")

@@ -12,7 +12,7 @@
 
 #define KEYBOARD_NOTES 12
 #define MAX_NOTE_EVENTS 20
-#define NOTES_DESTROY_LINE 600
+#define PIANO_START_LINE (GetScreenHeight() * 0.75)
 
 #define ATTACK_TIME  0.005f
 #define RELEASE_TIME 0.03f
@@ -236,7 +236,7 @@ void draw_notes(AppState *app) {
             if (app->vnotes[i][j].active) {
                 app->vnotes[i][j].y += dt * 60; // TODO: Replace with const
 
-                if (app->vnotes[i][j].y > 50) {
+                if (app->vnotes[i][j].y > PIANO_START_LINE / 10) {
                     app->vnotes[i][j].active = false;
                     // Shifting active notes
                     for (int k = j; k < app->vnotesIndex[i] - 1; k++) app->vnotes[i][k] = app->vnotes[i][k + 1];
@@ -281,7 +281,7 @@ void render_spark(Shader spark_shader,
             (Rectangle) {0,0,sparkTexture.width,sparkTexture.height},
             (Rectangle) {
             x - (sparkTexture.width/2.0f) + (width/2.0f),
-            NOTES_DESTROY_LINE - (sparkTexture.height/2.0f),
+            PIANO_START_LINE - (sparkTexture.height/2.0f),
             sparkTexture.width, sparkTexture.height},
             Vector2Zero(), 0.0f, WHITE);
     EndShaderMode();
@@ -289,8 +289,8 @@ void render_spark(Shader spark_shader,
 }
 void draw_piano_keys(AppState *app, bool is_black) {
     const int whiteKeyCount = 7;
-    float piano_height = GetScreenHeight() - NOTES_DESTROY_LINE;
-    float pianoY = NOTES_DESTROY_LINE;
+    float piano_height = GetScreenHeight() - PIANO_START_LINE;
+    float pianoY = PIANO_START_LINE;
     float whiteKeyWidth = (float)GetScreenWidth() / whiteKeyCount;
     float blackKeyWidth =  whiteKeyWidth * 0.6f;
     float blackKeyHeight = piano_height * 0.6f;
@@ -363,8 +363,8 @@ void draw_piano_keys(AppState *app, bool is_black) {
 }
 
 void draw_piano(AppState *app) {
-    float piano_height = GetScreenHeight() - NOTES_DESTROY_LINE;
-    float pianoY = NOTES_DESTROY_LINE;
+    float piano_height = GetScreenHeight() - PIANO_START_LINE;
+    float pianoY = PIANO_START_LINE;
 
     DrawRectangle(0, pianoY - 10, GetScreenWidth(), piano_height + 10, DARKBROWN);
 
@@ -411,25 +411,25 @@ int main(void) {
             draw_notes(&app);
 
             DrawLineEx(
-                    (Vector2) {.x=0,.y=NOTES_DESTROY_LINE},
-                    (Vector2) {.x=GetScreenWidth(),.y=NOTES_DESTROY_LINE},
+                    (Vector2) {.x=0,.y=PIANO_START_LINE},
+                    (Vector2) {.x=GetScreenWidth(),.y=PIANO_START_LINE},
                     1.2f, RAYWHITE);
             DrawRectangle(
-                    0, NOTES_DESTROY_LINE, GetScreenWidth(),
-                    GetScreenHeight() - NOTES_DESTROY_LINE, BLACK);
+                    0, PIANO_START_LINE, GetScreenWidth(),
+                    GetScreenHeight() - PIANO_START_LINE, BLACK);
 
             // ---- Spark Shaders ---- //
             for (int i=0; i < KEYBOARD_NOTES; ++i) {
                 int note_width_box = 20;
                 int note_start_box = ((GetScreenWidth() / 24) * ((i * 2) + 1)) - (note_width_box / 2);
                 age += GetFrameTime();
-                if (app.vnotesIndex[i] == 0 && app.notes[i].note_down_time > 50) {
+                if (app.vnotesIndex[i] == 0 && app.notes[i].note_down_time > PIANO_START_LINE / 10) {
                     render_spark(spark_shader, sparkTexture, i, note_start_box, note_width_box, age);
                 } else {
                     for (int j = app.vnotesIndex[i] - 1; j >= 0; j--) {
                         VisualNote vnote = app.vnotes[i][j];
                         float gravity_speed = 10;
-                        if ((vnote.y + vnote.duration) * gravity_speed > NOTES_DESTROY_LINE) {
+                        if ((vnote.y + vnote.duration) * gravity_speed > PIANO_START_LINE) {
                             render_spark(spark_shader, sparkTexture, i, note_start_box, note_width_box, age);
                         }
                     }

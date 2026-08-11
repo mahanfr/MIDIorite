@@ -1,10 +1,11 @@
+#include "embedded/spark_vs.h"
 #include <math.h>
 #include <raylib.h>
 #include <raymath.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include "embed.h"
+#include <embedded/assets.h>
 #define BUFFER_SIZE 2048
 #define SAMPLE_RATE 48000
 #define SAMPLE_SIZE 32
@@ -388,7 +389,7 @@ int main(void) {
     Image img = GenImageColor(128, 128, WHITE);
     Texture2D sparkTexture = LoadTextureFromImage(img);
     UnloadImage(img);
-    Shader spark_shader = LoadShaderFromMemory(SparkVertexShader, SparkFragmentShader);
+    Shader spark_shader = LoadShaderFromMemory((const char*)embedded_spark_vs, (const char*)embedded_spark_fs);
 
     sparkShaderTimeLoc = GetShaderLocation(spark_shader, "time");
     sparkShaderSeedLoc = GetShaderLocation(spark_shader, "age");

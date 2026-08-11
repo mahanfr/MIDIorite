@@ -1,47 +1,99 @@
-cmake_minimum_required(VERSION 3.10)
-project(midi-orite C)
+cmake_minimum_required(VERSION 3.20)
+option(MINGW "Build for Windows using MinGW" OFF)
+
+if(MINGW)
+    set(CMAKE_SYSTEM_NAME Windows)
+
+    set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)
+    set(CMAKE_RC_COMPILER x86_64-w64-mingw32-windres)
+endif()
+
+project(midiorite VERSION 1.0 LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
 
-file(COPY ${CMAKE_SOURCE_DIR}/assets
-    DESTINATION ${CMAKE_BINARY_DIR}/bin
-)
-
-if(MSVC)
-    add_compile_options(/W4 /WX-)
-else()
+if(NOT MSVC)
     add_compile_options(-Wall -Wextra)
+else()
+    add_compile_options(/W4 /WX-)
 endif()
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
+add_executable(midiorite main.c)
 
-set(SOURCES main.c)
+target_include_directories(midiorite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_executable(midi-orite ${SOURCES} ${ASSETS})
+if(WIN32)
 
-target_link_libraries(midi-orite raylib m)
+    if(MSVC)
 
-if(UNIX AND NOT WIN32)
-    target_link_libraries(midi-orite
-        GL pthread dl rt X11)
-elseif(WIN32)
-    if(MINGW)
-        target_link_libraries(midi-orite
-            winmm gdi32 opengl32)
-    elseif(MSVC)
-        target_link_libraries(midi-orite
-            winmm.lib gdi32.lib opengl32.lib)
+        message(STATUS "Building Windows / MSVC")
+
+        set(RAYLIB_DIR
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs/raylib/win32-msvc
+        )
+
+        target_link_libraries(midiorite PRIVATE
+            ${RAYLIB_DIR}/raylib.lib
+            winmm
+            gdi32
+            opengl32
+        )
+
+        set_target_properties(midiorite PROPERTIES
+            WIN32_EXECUTABLE TRUE
+        )
+
+    elseif(MINGW)
+
+        message(STATUS "Building Windows / MinGW")
+
+        set(RAYLIB_DIR
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs/raylib/win32-mingw
+        )
+
+        target_link_libraries(midiorite PRIVATE
+            ${RAYLIB_DIR}/libraylib.a
+            winmm
+            gdi32
+            opengl32
+            mingwex
+        )
+
+        target_link_options(midiorite PRIVATE
+            -Wl,--defsym,stat64i32=_stat64
+            -Wl,--subsystem,windows
+        )
+
     endif()
-endif()
 
-set_target_properties(midi-orite PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
+elseif(UNIX)
 
-if(UNIX AND NOT WIN32)
-    set_target_properties(midi-orite PROPERTIES
-        INSTALL_RPATH "${CMAKE_SOURCE_DIR}/libs"
+    message(STATUS "Building Linux")
+
+    set(RAYLIB_DIR
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/raylib/linux
     )
+
+    target_link_libraries(midiorite PRIVATE
+        ${RAYLIB_DIR}/libraylib.a
+        m
+        GL
+        pthread
+        dl
+        rt
+        X11
+    )
+
 endif()
+
+# Embed assets
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedAssets.cmake)
+
+embed_assets(
+    midiorite
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets
+)

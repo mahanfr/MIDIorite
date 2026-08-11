@@ -1,0 +1,173 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+
+  # ------------------------------------------------------------
+  # Linux
+  # ------------------------------------------------------------
+
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgl-dev \
+            libx11-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --config Release
+
+      - name: Package
+        run: |
+          mkdir -p package
+          cp build/midiorite package/midiorite
+          tar -czf midiorite-linux-x86_64.tar.gz -C package midiorite
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: midiorite-linux-x86_64
+          path: midiorite-linux-x86_64.tar.gz
+
+
+  # ------------------------------------------------------------
+  # Windows / MinGW
+  # ------------------------------------------------------------
+
+  windows-mingw:
+    name: Windows MinGW
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install MinGW
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-mingw-w64-x86-64
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DMINGW=ON \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --config Release
+
+      - name: Package
+        run: |
+          mkdir -p package
+          cp build/midiorite.exe package/midiorite.exe
+          cd package
+          zip ../midiorite-windows-mingw-x86_64.zip midiorite.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: midiorite-windows-mingw-x86_64
+          path: midiorite-windows-mingw-x86_64.zip
+
+
+  # ------------------------------------------------------------
+  # Windows / MSVC
+  # ------------------------------------------------------------
+
+  windows-msvc:
+    name: Windows MSVC
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -A x64
+
+      - name: Build
+        run: |
+          cmake --build build --config Release
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package
+          Copy-Item build/Release/midiorite.exe package/midiorite.exe
+          Compress-Archive `
+            -Path package/midiorite.exe `
+            -DestinationPath midiorite-windows-msvc-x86_64.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: midiorite-windows-msvc-x86_64
+          path: midiorite-windows-msvc-x86_64.zip
+
+
+  # ------------------------------------------------------------
+  # Create GitHub Release
+  # ------------------------------------------------------------
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+
+    needs:
+      - linux
+      - windows-mingw
+      - windows-msvc
+
+    steps:
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: midiorite-linux-x86_64
+          path: release
+
+      - name: Download Windows MinGW artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: midiorite-windows-mingw-x86_64
+          path: release
+
+      - name: Download Windows MSVC artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: midiorite-windows-msvc-x86_64
+          path: release
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/midiorite-linux-x86_64.tar.gz
+            release/midiorite-windows-mingw-x86_64.zip
+            release/midiorite-windows-msvc-x86_64.zip
